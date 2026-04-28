@@ -102,7 +102,6 @@ DAMPING -> STAND -> WAIT_LOCO -> LOCO -> DANCE
 
 - `qpos`：29 维关节角
 - `qvel`：29 维关节速度
-- `tau`：29 维估计力矩
 - `quat`：4 维 IMU 四元数
 - `rpy`：3 维欧拉角
 - `gyro`：3 维 IMU 角速度
@@ -195,7 +194,7 @@ obs =
 #### 1. `ref_joint_pos(29)`
 
 当前参考轨迹帧的 29 个参考关节角。  
-取自 `qpos.onnx` 当前帧。  
+默认从 `storage/data/mocap/lafan1/UnitreeG1/dance1_subject1.npz` 读取并适配得到。  
 
 #### 2. `ref_projected_gravity(3)`
 
@@ -271,11 +270,7 @@ target[joint_id] = ref_qpos[joint_id] + action[i] * 1.0
 
 
 
-## 入口与默认资源
-
-主入口是 [state_machine.py](/home/galbot/Project/deploy_dance_0427/state_machine.py:395)。
-
-默认运行方式：
+## 运行方式
 
 ```bash
 python3 state_machine.py eno1
@@ -288,11 +283,12 @@ python3 state_machine.py eno1
 - `--loco-to-dance-arm-blend-s`：loco 切 dance 前双臂过渡时长，默认 `2.0`
 - `--providers`：ONNX Runtime providers
 - `--no-release-motion`：跳过释放已有高层运动模式
+- `--dance-reference`：dance 参考轨迹，默认 `storage/data/mocap/lafan1/UnitreeG1/dance1_subject1.npz`，也兼容 legacy `.onnx`
 
 默认资源路径：
 - `stand` 配置：`models/unitree_g1_fsm/stand/stand.json`
 - `loco` 配置：`models/unitree_g1_fsm/loco/loco.json`
 - `loco` 模型：`models/unitree_g1_fsm/loco/policy.onnx`
-- `dance` 配置：`models/unitree_g1_fsm/dance_data/dance.json`
-- `dance` 模型：`models/unitree_g1_fsm/dance_data/policy.onnx`
-- `dance` 参考轨迹：`models/unitree_g1_fsm/dance_data/qpos.onnx`
+- `dance` 配置：`models/unitree_g1_fsm/dance/dance.json`
+- `dance` 模型：`models/unitree_g1_fsm/dance/policy.onnx`
+- `dance` 参考轨迹：`storage/data/mocap/lafan1/UnitreeG1/dance1_subject1.npz`
