@@ -25,6 +25,7 @@ class DanceController:
         policy_path: Path,
         config_path: Path,
         providers: list[str] | None,
+        reference_path: Path | None = None,
     ) -> None:
         self.policy = OnnxRunner(policy_path, providers)
         self.cfg = load_json_or_yaml(config_path)
@@ -37,8 +38,16 @@ class DanceController:
         self.action_scale = 1.0
         self.onnx_input_size = self.obs_joint_num * 4 + 9
 
-        qpos_path = resolve_asset_path(config_path, str(self.cfg["ref_qpos_path"]))
-        self.ref_qpos_all = OnnxRunner(qpos_path, providers).run()
+        ref_source = reference_path
+        if ref_source is None:
+            ref_source = resolve_asset_path(config_path, str(self.cfg["ref_qpos_path"]))
+        else:
+            ref_source = resolve_asset_path(config_path, str(reference_path))
+
+        if ref_source.suffix == ".npz":
+            self.ref_qpos_all = self._load_reference_from_npz(ref_source)
+        else:
+            self.ref_qpos_all = OnnxRunner(ref_source, providers).run()
         self.end_iter = int(self.ref_qpos_all.shape[0])
 
         if self.policy.expected_input_size not in (None, self.onnx_input_size):
@@ -52,6 +61,70 @@ class DanceController:
         self.last_motor_targets = self.default_qpos.copy()
         self.inference_counter = 0
         self.done = False
+
+    @staticmethod
+    def _joint_name_to_index() -> dict[str, int]:
+        return {
+            "left_hip_pitch_joint": 0,
+            "left_hip_roll_joint": 1,
+            "left_hip_yaw_joint": 2,
+            "left_knee_joint": 3,
+            "left_ankle_pitch_joint": 4,
+            "left_ankle_roll_joint": 5,
+            "right_hip_pitch_joint": 6,
+            "right_hip_roll_joint": 7,
+            "right_hip_yaw_joint": 8,
+            "right_knee_joint": 9,
+            "right_ankle_pitch_joint": 10,
+            "right_ankle_roll_joint": 11,
+            "waist_yaw_joint": 12,
+            "waist_roll_joint": 13,
+            "waist_pitch_joint": 14,
+            "left_shoulder_pitch_joint": 15,
+            "left_shoulder_roll_joint": 16,
+            "left_shoulder_yaw_joint": 17,
+            "left_elbow_joint": 18,
+            "left_wrist_roll_joint": 19,
+            "left_wrist_pitch_joint": 20,
+            "left_wrist_yaw_joint": 21,
+            "right_shoulder_pitch_joint": 22,
+            "right_shoulder_roll_joint": 23,
+            "right_shoulder_yaw_joint": 24,
+            "right_elbow_joint": 25,
+            "right_wrist_roll_joint": 26,
+            "right_wrist_pitch_joint": 27,
+            "right_wrist_yaw_joint": 28,
+        }
+
+    def _load_reference_from_npz(self, path: Path) -> np.ndarray:
+        motion = np.load(path, allow_pickle=True)
+        qpos = np.asarray(motion["qpos"], dtype=np.float32)
+        joint_names = [str(name) for name in motion["joint_names"].reshape(-1)]
+
+        if qpos.ndim != 2 or qpos.shape[1] < 7:
+            raise ValueError(f"invalid mocap qpos shape in {path}: {qpos.shape}")
+        if not joint_names or joint_names[0] != "root":
+            raise ValueError(f"expected joint_names[0] to be 'root' in {path}")
+
+        ref_qpos = np.repeat(self.default_qpos.reshape(1, -1), qpos.shape[0], axis=0)
+        joint_to_index = self._joint_name_to_index()
+
+        expected_joint_count = qpos.shape[1] - 7
+        mocap_joint_names = joint_names[1:]
+        if len(mocap_joint_names) != expected_joint_count:
+            raise ValueError(
+                f"mocap joint_names mismatch in {path}: "
+                f"{len(mocap_joint_names)} names for {expected_joint_count} joint columns"
+            )
+
+        for mocap_col, joint_name in enumerate(mocap_joint_names, start=7):
+            target_index = joint_to_index.get(joint_name)
+            if target_index is None:
+                continue
+            ref_qpos[:, target_index] = qpos[:, mocap_col]
+
+        ref_quat = qpos[:, 3:7]
+        return np.concatenate([ref_quat, ref_qpos], axis=1).astype(np.float32, copy=False)
 
     def reset(self, current_qpos: np.ndarray) -> None:
         self.last_motor_targets = _as_f32(current_qpos, G1_NUM_MOTOR).copy()

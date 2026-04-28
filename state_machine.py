@@ -92,7 +92,12 @@ class G1StateMachine:
                 f"stand init_pos in {args.stand_config} must exactly match "
                 f"loco init_pos in {args.loco_config}"
             )
-        self.dance = DanceController(args.dance_policy, args.dance_config, providers)
+        self.dance = DanceController(
+            args.dance_policy,
+            args.dance_config,
+            providers,
+            reference_path=args.dance_reference,
+        )
 
     def _release_motion_mode(self) -> None:
         try:
@@ -131,7 +136,6 @@ class G1StateMachine:
 
         qpos = np.array([float(_field(motor_states[i], "q")) for i in range(G1_NUM_MOTOR)], dtype=np.float32)
         qvel = np.array([float(_field(motor_states[i], "dq")) for i in range(G1_NUM_MOTOR)], dtype=np.float32)
-        tau = np.array([float(_field(motor_states[i], "tau_est")) for i in range(G1_NUM_MOTOR)], dtype=np.float32)
         quat = _as_f32(_field(imu_state, "quaternion"), 4)
         rpy = _as_f32(_field(imu_state, "rpy"), 3)
         gyro = _as_f32(_field(imu_state, "gyroscope"), 3)
@@ -141,7 +145,6 @@ class G1StateMachine:
             self.state = RobotState(
                 qpos=qpos,
                 qvel=qvel,
-                tau=tau,
                 quat=quat,
                 rpy=rpy,
                 gyro=gyro,
@@ -156,7 +159,6 @@ class G1StateMachine:
             return RobotState(
                 qpos=self.state.qpos.copy(),
                 qvel=self.state.qvel.copy(),
-                tau=self.state.tau.copy(),
                 quat=self.state.quat.copy(),
                 rpy=self.state.rpy.copy(),
                 gyro=self.state.gyro.copy(),
@@ -384,6 +386,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--loco-config", type=Path, default=default_models / "loco" / "loco.json")
 
     parser.add_argument("--dance-policy", type=Path, default=default_models / "dance" / "policy.onnx")
+    parser.add_argument(
+        "--dance-reference",
+        type=Path,
+        default=root / "storage" / "data" / "mocap" / "lafan1" / "UnitreeG1" / "dance1_subject1.npz",
+        help="dance reference trajectory (.npz mocap or legacy .onnx)",
+    )
     parser.add_argument(
         "--dance-config",
         type=Path,

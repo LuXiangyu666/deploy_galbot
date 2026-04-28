@@ -93,7 +93,6 @@ class Gamepad:
 class RobotState:
     qpos: np.ndarray
     qvel: np.ndarray
-    tau: np.ndarray
     quat: np.ndarray
     rpy: np.ndarray
     gyro: np.ndarray
