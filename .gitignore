@@ -4,3 +4,4 @@ __pycache__/
 .idea
 models/unitree_g1_fsm/dance/model.onnxmodels/unitree_g1_fsm/dance/model.onnx
 models/unitree_g1_fsm/dance/model.onnx
+models/unitree_g1_fsm/dance/model.onnx
