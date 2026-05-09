@@ -97,6 +97,7 @@ class G1StateMachine:
             args.dance_config,
             providers,
             reference_path=args.dance_reference,
+            control_dt=args.dt,
         )
 
     def _release_motion_mode(self) -> None:
@@ -337,10 +338,10 @@ class G1StateMachine:
                 self.enter_loco()
                 return "loco"
             target = self.dance.calculate(state)
-            self._write_pd(target, self.dance.kp, self.dance.kd, state.mode_machine)
             if self.dance.done:
                 self.enter_loco()
                 return "loco"
+            self._write_pd(target, self.dance.kp, self.dance.kd, state.mode_machine)
             self._sleep_until_next(tick)
 
     def run(self) -> None:
@@ -385,12 +386,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--loco-policy", type=Path, default=default_models / "loco" / "policy.onnx")
     parser.add_argument("--loco-config", type=Path, default=default_models / "loco" / "loco.json")
 
-    parser.add_argument("--dance-policy", type=Path, default=default_models / "dance" / "policy.onnx")
+    parser.add_argument("--dance-policy", type=Path, default=default_models / "dance" / "model.onnx")
     parser.add_argument(
         "--dance-reference",
         type=Path,
         default=root / "storage" / "data" / "mocap" / "lafan1" / "UnitreeG1" / "dance1_subject3.npz",
-        help="dance reference trajectory (.npz mocap or legacy .onnx)",
+        help="dance reference trajectory (.npz with qpos/qvel)",
     )
     parser.add_argument(
         "--dance-config",

@@ -4,7 +4,7 @@
 
 - 状态机各模式的切换逻辑
 - `loco` 和 `dance` 模型的输入输出处理
-- `dance` 模型在部署时的 125 维输入构成
+- `dance` 模型在部署时与 tracking `state_dict` 对齐的输入构成
 
 ## 状态机模式与切换逻辑
 
@@ -166,61 +166,78 @@ target = default_qpos + action * action_scale
 
 ## DANCE 模型的输入输出
 
-### 输入：125 维
+### 输入：162 维
 
-`DanceController` 现在按训练环境 `g1_env_tracking_general.py` 的 actor `state` 语义组装输入。
+`DanceController` 按 `track_mj/envs/g1_tracking/play/play_g1_env_tracking_general.py:327` 的完整 `state_dict` 字段组装 actor `state`，字段顺序按名称字母排序。
 
 输入顺序是：
 
 ```text
 obs =
 [
-  ref_joint_pos(29),
-  ref_projected_gravity(3),
-  curr_projected_gravity(3),
-  curr_gyro_scaled(3),
-  curr_joint_pos_minus_default(29),
-  curr_joint_vel_scaled(29),
+  dif_joint_pos(29),
+  dif_joint_vel_scaled(29),
+  gvec_pelvis(3),
+  gyro_pelvis_scaled(3),
+  joint_pos_minus_default(29),
+  joint_vel_scaled(29),
   last_motor_targets(29),
+  ref_feet_height(4),
+  ref_root_angvel_scaled(3),
+  ref_root_height(1),
+  ref_root_linvel_scaled(3),
 ]
 ```
 
 总维度：
 
-- `29 + 3 + 3 + 3 + 29 + 29 + 29 = 125`
+- `29 + 29 + 3 + 3 + 29 + 29 + 29 + 4 + 3 + 1 + 3 = 162`
 
 各字段语义如下。
 
-#### 1. `ref_joint_pos(29)`
+#### 1. `dif_joint_pos(29)`
 
-当前参考轨迹帧的 29 个参考关节角。  
-默认从 `storage/data/mocap/lafan1/UnitreeG1/dance1_subject1.npz` 读取并适配得到。  
+当前参考轨迹帧关节角减当前机器人关节角。
 
-#### 2. `ref_projected_gravity(3)`
+#### 2. `dif_joint_vel_scaled(29)`
 
-当前参考轨迹帧根部四元数对应的 projected gravity。  
+当前参考轨迹帧关节速度减当前机器人关节速度，再乘 `dif_joint_vel` scale。当前配置为 `0.05`。
 
-#### 3. `curr_projected_gravity(3)`
+#### 3. `gvec_pelvis(3)`
 
-当前机器人 IMU 四元数对应的 projected gravity。  
+当前机器人 pelvis IMU 姿态对应的 projected gravity。部署端用 DDS IMU 四元数计算，与 play 环境的 `site_xmat.T @ [0, 0, -1]` 同一语义。
 
-#### 4. `curr_gyro_scaled(3)`
+#### 4. `gyro_pelvis_scaled(3)`
 
-当前 IMU 角速度，乘 `joint_vel_scale`。  
-当前配置里这个 scale 是 `0.05`。  
+当前 IMU 角速度，乘 `joint_vel` scale。当前配置为 `0.05`。
 
-#### 5. `curr_joint_pos_minus_default(29)`
+#### 5. `joint_pos_minus_default(29)`
 
-当前关节角相对 `DEFAULT_QPOS` 的偏移。  
+当前关节角相对 `DEFAULT_QPOS` 的偏移。
 
-#### 6. `curr_joint_vel_scaled(29)`
+#### 6. `joint_vel_scaled(29)`
 
-当前关节速度乘 `joint_vel_scale`。  
+当前关节速度乘 `joint_vel` scale。
 
 #### 7. `last_motor_targets(29)`
 
-上一拍实际下发给 dance 的目标关节角。  
-进入 dance 时，它会先用当前 `qpos` 初始化。  
+上一拍实际下发给 dance 的目标关节角。进入 dance 时，它会先用当前 `qpos` 初始化。
+
+#### 8. `ref_feet_height(4)`
+
+当前参考轨迹帧四个足部 site 高度，顺序为 `left_foot/right_foot/left_foot_top/right_foot_top`。
+
+#### 9. `ref_root_angvel_scaled(3)`
+
+参考根部角速度乘 `joint_vel` scale。
+
+#### 10. `ref_root_height(1)`
+
+当前参考轨迹帧根部高度，即 `traj_data.qpos[2]`。
+
+#### 11. `ref_root_linvel_scaled(3)`
+
+参考根部线速度转到参考根坐标系后乘 `joint_vel` scale。
 
 ### 输出：29 维动作
 
@@ -283,7 +300,7 @@ python3 state_machine.py eno1
 - `--loco-to-dance-arm-blend-s`：loco 切 dance 前双臂过渡时长，默认 `2.0`
 - `--providers`：ONNX Runtime providers
 - `--no-release-motion`：跳过释放已有高层运动模式
-- `--dance-reference`：dance 参考轨迹，默认 `storage/data/mocap/lafan1/UnitreeG1/dance1_subject1.npz`，也兼容 legacy `.onnx`
+- `--dance-reference`：dance 参考轨迹，默认 `storage/data/mocap/lafan1/UnitreeG1/dance1_subject3.npz`；必须是带 `qpos/qvel` 的 `.npz`
 
 默认资源路径：
 - `stand` 配置：`models/unitree_g1_fsm/stand/stand.json`
@@ -291,4 +308,4 @@ python3 state_machine.py eno1
 - `loco` 模型：`models/unitree_g1_fsm/loco/policy.onnx`
 - `dance` 配置：`models/unitree_g1_fsm/dance/dance.json`
 - `dance` 模型：`models/unitree_g1_fsm/dance/policy.onnx`
-- `dance` 参考轨迹：`storage/data/mocap/lafan1/UnitreeG1/dance1_subject1.npz`
+- `dance` 参考轨迹：`storage/data/mocap/lafan1/UnitreeG1/dance1_subject3.npz`
