@@ -389,7 +389,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dance-reference",
         type=Path,
-        default=root / "storage" / "data" / "mocap" / "lafan1" / "UnitreeG1" / "dance1_subject1.npz",
+        default=root / "storage" / "data" / "mocap" / "lafan1" / "UnitreeG1" / "dance1_subject3.npz",
         help="dance reference trajectory (.npz mocap or legacy .onnx)",
     )
     parser.add_argument(
