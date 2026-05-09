@@ -172,6 +172,11 @@ def apply_pd_torque(model, data, target: np.ndarray, kp: np.ndarray, kd: np.ndar
 
 
 def initialize_from_reference(mujoco, model, data, dance: DanceController, row: int = 0) -> None:
+    set_reference_state(mujoco, model, data, dance, row)
+    data.ctrl[:] = data.qpos[7 : 7 + G1_NUM_MOTOR]
+
+
+def set_reference_state(mujoco, model, data, dance: DanceController, row: int) -> None:
     data.qpos[:] = np.concatenate(
         [
             dance.ref_root_pos_all[row],
@@ -185,7 +190,6 @@ def initialize_from_reference(mujoco, model, data, dance: DanceController, row: 
             dance.ref_joint_vel_all[row],
         ]
     ).astype(np.float32, copy=False)
-    data.ctrl[:] = data.qpos[7 : 7 + G1_NUM_MOTOR]
     mujoco.mj_forward(model, data)
 
 
@@ -259,10 +263,9 @@ def run_sim(args: argparse.Namespace) -> None:
             mujoco.mj_step(model, data)
 
         if args.print_every > 0 and step % args.print_every == 0:
-            err = float(np.linalg.norm(target - data.qpos[7 : 7 + G1_NUM_MOTOR]))
             print(
                 f"step={step:05d} mode=dance time={data.time:7.3f} "
-                f"frame={dance.inference_counter:05d}/{dance.end_iter:05d} target_err={err:.4f}"
+                f"frame={dance.inference_counter:05d}/{dance.end_iter:05d}"
             )
         return True
 

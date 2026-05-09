@@ -192,5 +192,6 @@
         "right_foot_top"
     ],
     "reference_mjcf_path": "../../../assets/unitree_g1/scene_mjx_flat_terrain_opentrack.xml",
+    "reference_height_offset": -0.029,
     "ref_qpos_path": "../../../storage/data/mocap/lafan1/UnitreeG1/dance1_subject3.npz"
 }

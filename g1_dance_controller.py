@@ -44,6 +44,7 @@ class DanceController:
         self.action_joint_num = int(self.action_joint_ids.size)
         self.joint_vel_scale = float(self.cfg["joint_vel_scale"])
         self.action_scale = float(self.cfg.get("action_scale", 1.0))
+        self.reference_height_offset = float(self.cfg.get("reference_height_offset", 0.0))
         self.control_dt = float(control_dt)
 
         obs_scales = self.cfg.get("obs_scales", {})
@@ -144,6 +145,7 @@ class DanceController:
             raise ValueError(f"dance reference root qvel shape mismatch: {self.ref_root_qvel_all.shape}")
         if self.ref_joint_vel_all.shape != (self.ref_qpos_all.shape[0], G1_NUM_MOTOR):
             raise ValueError(f"dance reference joint velocity shape mismatch: {self.ref_joint_vel_all.shape}")
+        self._apply_reference_height_offset()
         self.end_iter = int(self.ref_qpos_all.shape[0])
         self.ref_feet_height_all: np.ndarray | None = None
 
@@ -206,15 +208,14 @@ class DanceController:
         if not joint_names or joint_names[0] != "root":
             raise ValueError(f"expected joint_names[0] to be 'root' in {path}")
 
-        if bool(self.cfg.get("recalculate_vel_in_reference_motion", True)):
-            qvel = self._recalculate_reference_qvel(qpos, qvel)
-
         source_frequency = float(np.asarray(motion["frequency"]).item()) if "frequency" in motion else 1.0 / self.control_dt
         if source_frequency <= 0.0:
             raise ValueError(f"invalid mocap frequency in {path}: {source_frequency}")
         target_frequency = 1.0 / self.control_dt
         if not np.isclose(source_frequency, target_frequency):
             qpos, qvel = self._interpolate_reference_motion(qpos, qvel, source_frequency, target_frequency)
+        if bool(self.cfg.get("recalculate_vel_in_reference_motion", True)):
+            qvel = self._recalculate_reference_qvel(qpos, qvel)
 
         ref_qpos = np.zeros((qpos.shape[0], G1_NUM_MOTOR), dtype=np.float32)
         ref_joint_vel = np.zeros((qpos.shape[0], G1_NUM_MOTOR), dtype=np.float32)
@@ -254,6 +255,12 @@ class DanceController:
                 f"expected {self.tracking_input_size}, got {expected}"
             )
 
+    def _apply_reference_height_offset(self) -> None:
+        if np.isclose(self.reference_height_offset, 0.0):
+            return
+        self.ref_root_pos_all = self.ref_root_pos_all.astype(np.float32, copy=True)
+        self.ref_root_pos_all[:, 2] += self.reference_height_offset
+
     def _recalculate_reference_qvel(self, qpos: np.ndarray, qvel: np.ndarray) -> np.ndarray:
         qvel = qvel.copy()
         if qpos.shape[0] <= 1:
@@ -263,6 +270,7 @@ class DanceController:
         qvel[1:, :3] = (qpos[1:, :3] - qpos[:-1, :3]) * frequency
         qvel[1:, 3:6] = self._quat_delta_angvel(qpos[:-1, 3:7], qpos[1:, 3:7]) * frequency
         qvel[1:, 6:] = (qpos[1:, 7:] - qpos[:-1, 7:]) * frequency
+        qvel[0] = qvel[1]
         return qvel.astype(np.float32, copy=False)
 
     @staticmethod
@@ -289,8 +297,9 @@ class DanceController:
         non_quat_ids = [idx for idx in range(qpos.shape[1]) if idx < 3 or idx >= 7]
         qpos_interp[:, non_quat_ids] = interp1d(old_t, qpos[:, non_quat_ids], kind="cubic", axis=0)(new_t)
 
-        # Match OpenTrack's interpolate_trajectories implementation exactly.
-        qpos_interp[:, 3:7] = Slerp(old_t, Rotation.from_quat(qpos[:, 3:7]))(new_t).as_quat()
+        quat_xyzw = qpos[:, [4, 5, 6, 3]]
+        quat_interp_xyzw = Slerp(old_t, Rotation.from_quat(quat_xyzw))(new_t).as_quat()
+        qpos_interp[:, 3:7] = quat_interp_xyzw[:, [3, 0, 1, 2]]
 
         qvel_interp = interp1d(old_t, qvel, kind="cubic", axis=0)(new_t).astype(np.float32)
         return qpos_interp.astype(np.float32, copy=False), qvel_interp
