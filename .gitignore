@@ -2,3 +2,4 @@ storage/
 __pycache__/
 .codex
 .idea
+models/unitree_g1_fsm/dance/model.onnx
