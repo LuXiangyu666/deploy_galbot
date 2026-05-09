@@ -343,9 +343,9 @@ class DanceController:
                 pass
 
         candidates = [
+            Path(__file__).resolve().parent / "assets" / "unitree_g1" / "scene_mjx_flat_terrain_opentrack.xml",
+            Path(__file__).resolve().parent / "assets" / "unitree_g1" / "scene_mjx_flat_terrain.xml",
             Path(__file__).resolve().parent / "storage" / "assets" / "unitree_g1" / "scene_mjx_flat_terrain.xml",
-            Path(__file__).resolve().parent.parent / "OpenTrack" / "storage" / "assets" / "unitree_g1" / "scene_mjx_flat_terrain.xml",
-            Path.cwd().parent / "OpenTrack" / "storage" / "assets" / "unitree_g1" / "scene_mjx_flat_terrain.xml",
         ]
         for candidate in candidates:
             candidate = candidate.resolve()
@@ -364,7 +364,7 @@ class DanceController:
         mjcf_path = self._resolve_reference_mjcf_path()
         if mjcf_path is None:
             raise FileNotFoundError(
-                "tracking-aligned dance observations require reference_mjcf_path or a sibling OpenTrack asset tree"
+                "tracking-aligned dance observations require reference_mjcf_path or project-local MJCF assets"
             )
 
         model = mujoco.MjModel.from_xml_path(str(mjcf_path))

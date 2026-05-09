@@ -21,7 +21,7 @@ from g1_dance_controller import DanceController
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_MODELS = ROOT / "models" / "unitree_g1_fsm"
-DEFAULT_SCENE = Path("/home/galbot/Project/OpenTrack/storage/assets/unitree_g1/scene_mjx_flat_terrain.xml")
+DEFAULT_SCENE = ROOT / "assets" / "unitree_g1" / "scene_mjx_flat_terrain_opentrack.xml"
 DEFAULT_DANCE_REFERENCE = ROOT / "storage" / "data" / "mocap" / "lafan1" / "UnitreeG1" / "dance1_subject3.npz"
 TORQUE_LIMIT = np.array(
     [

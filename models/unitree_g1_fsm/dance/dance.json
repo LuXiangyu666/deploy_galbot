@@ -191,5 +191,6 @@
         "left_foot_top",
         "right_foot_top"
     ],
-    "ref_qpos_path": "storage/data/mocap/lafan1/UnitreeG1/dance1_subject3.npz"
+    "reference_mjcf_path": "../../../assets/unitree_g1/scene_mjx_flat_terrain_opentrack.xml",
+    "ref_qpos_path": "../../../storage/data/mocap/lafan1/UnitreeG1/dance1_subject3.npz"
 }
